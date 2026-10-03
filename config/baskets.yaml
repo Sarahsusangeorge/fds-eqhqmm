@@ -1,0 +1,8 @@
+# Basket definitions. Frozen before experiments: change only by agreement.
+us_sectors:
+  tickers: [XLB, XLE, XLF, XLI, XLK, XLP, XLU, XLV, XLY]
+  start: "1999-01-01"
+developed_countries:
+  tickers: []        # nine iShares MSCI country ETFs listed since 1996, to be fixed before experiments
+  start: "1999-01-01"
+data_freeze: "2026-09-30"

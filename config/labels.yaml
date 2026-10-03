@@ -1,0 +1,16 @@
+# Regime-definition parameters. Frozen before the first test run.
+r1_bear:
+  drop: 0.20
+  recovery: 0.15
+r2_vol:
+  window: 21
+  percentile: 90
+  vix_threshold: 30
+r3_consensus:
+  pelt_penalty: auto
+r4_events:
+  tolerance_days: 10
+scoring:
+  early_credit_days: 20
+  late_window_days: 40
+  declutter_days: 20

@@ -1,0 +1,16 @@
+# Replace the @usernames with each member's real GitHub username.
+/data/                        @SHRIKER_GITHUB
+/labels/                      @SHRIKER_GITHUB
+/harness/                     @SHRIKER_GITHUB
+/models/classical/            @SHRIKER_GITHUB
+/models/hqmm/engine.py        @SARAH_GITHUB
+/models/hqmm/measurement.py   @SARAH_GITHUB
+/models/hqmm/generic.py       @SARAH_GITHUB
+/models/hqmm/model.py         @SARAH_GITHUB
+/models/oom/                  @SARAH_GITHUB
+/synthetic/                   @SARAH_GITHUB
+/models/hqmm/equivariant.py   @ABHINAV_GITHUB
+/models/neural/               @ABHINAV_GITHUB
+/models/geometric/            @ABHINAV_GITHUB
+/models/base.py               @SHRIKER_GITHUB @SARAH_GITHUB @ABHINAV_GITHUB
+/config/                      @SHRIKER_GITHUB @SARAH_GITHUB @ABHINAV_GITHUB

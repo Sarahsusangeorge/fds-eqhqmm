@@ -1,0 +1,5 @@
+scheme: expanding          # expanding | rolling
+first_train_end: "2004-12-31"
+test_step_months: 6
+rolling_years: 5
+val_fraction: 0.2
