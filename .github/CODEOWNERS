@@ -1,16 +1,15 @@
-# Replace the @usernames with each member's real GitHub username.
-/data/                        @SHRIKER_GITHUB
-/labels/                      @SHRIKER_GITHUB
-/harness/                     @SHRIKER_GITHUB
-/models/classical/            @SHRIKER_GITHUB
-/models/hqmm/engine.py        @SARAH_GITHUB
-/models/hqmm/measurement.py   @SARAH_GITHUB
-/models/hqmm/generic.py       @SARAH_GITHUB
-/models/hqmm/model.py         @SARAH_GITHUB
-/models/oom/                  @SARAH_GITHUB
-/synthetic/                   @SARAH_GITHUB
-/models/hqmm/equivariant.py   @ABHINAV_GITHUB
-/models/neural/               @ABHINAV_GITHUB
-/models/geometric/            @ABHINAV_GITHUB
-/models/base.py               @SHRIKER_GITHUB @SARAH_GITHUB @ABHINAV_GITHUB
-/config/                      @SHRIKER_GITHUB @SARAH_GITHUB @ABHINAV_GITHUB
+/data/                        @shriker18
+/labels/                      @shriker18
+/harness/                     @shriker18
+/models/classical/            @shriker18
+/models/hqmm/engine.py        @Sarahsusangeorge
+/models/hqmm/measurement.py   @Sarahsusangeorge
+/models/hqmm/generic.py       @Sarahsusangeorge
+/models/hqmm/model.py         @Sarahsusangeorge
+/models/oom/                  @Sarahsusangeorge
+/synthetic/                   @Sarahsusangeorge
+/models/hqmm/equivariant.py   @abhinavsknha
+/models/neural/               @abhinavsknha
+/models/geometric/            @abhinavsknha
+/models/base.py               @shriker18 @Sarahsusangeorge @abhinavsknha
+/config/                      @shriker18 @Sarahsusangeorge @abhinavsknha
