@@ -43,12 +43,43 @@ Score quality = AUC of the stress score against the hidden regime on test days.
    (−3.163 vs −3.157), so "best of several restarts by likelihood" does not reliably
    pick the regime-tracking run.
 
+## Session 2: fixing run-to-run variance
+
+8. **Parallel likelihood.** The whole-sequence likelihood is a product of small
+   superoperators S_y = A_y (x) conj(A_y); multiplying them pairwise (tree reduction,
+   with rescaling) gives the same number as the day-by-day filter (tested to 1e-8)
+   and made training ~3x faster, ~20 s per run (`total_loglik`, `train_lbfgs_fast`).
+9. **Choosing restarts by forecast skill, not likelihood.** Over 15 runs (full objective),
+   Spearman correlation with test AUC: validation log-likelihood 0.14, validation
+   forecast skill (corr of predicted vs next-day actual share of extreme moves) 0.77.
+   Best-of-3 expected AUC: 0.61 (by likelihood) vs 0.66 (by skill). Uses no labels.
+10. **Training on the big-move pattern only fixes the variance.** The full objective is
+    dominated by same-day direction (everyone up / everyone down). Fitting the same
+    quantum model to the extreme / not-extreme pattern only (`train_coarse`):
+
+    | Training objective | Test AUC over starts |
+    | --- | --- |
+    | Full symbols (15 starts) | mean 0.56, range 0.36–0.79 |
+    | Big-move pattern only (8 starts) | ≈ 0.77, range 0.74–0.81 |
+    | Big-move first, then full fine-tune (6 starts) | mean 0.60, range 0.43–0.76 |
+
+    Fine-tuning on full symbols undoes the gain, so the default is big-move only.
+11. **Fair classical comparison on the same big-move data** (exchangeable HMM, 8 starts):
+    2 states mean AUC 0.76 (range 0.41–0.87); 4 states 0.72 (0.43–0.87).
+    Our generic HQMM: similar average, much smaller spread. Synthetic data and few runs,
+    so this is encouraging, not a result.
+12. **New defaults** (`HQMMModel`): objective="coarse", selection="skill", 3 restarts.
+    `python -m experiments.synthetic_recovery` gives test AUC 0.72 in ~90 s.
+
+**For the team / paper:** the big-move objective is a modelling choice (we detect
+volatility regimes, so direction is left out of the training objective). Every classical
+and neural baseline must get the same choice for the comparison to be fair; Shriker's
+classical HMMs should therefore be fitted to the same extreme / not-extreme counts.
+
 ## Ideas not yet tried
-- Warm start: initialise so the register controls all asset rotations together
-  (the "register-controlled" structure the symmetric circuit has naturally).
-- Penalise or constrain the register-only part of V to stay near identity (persistent regimes).
-- Train on a two-part objective: likelihood + a small term rewarding persistence of the posterior.
-- Report AUC distribution over 10 seeds rather than one selected run (honest, matches the
-  paper's plan) and check whether the classical 4-state HMM also varies across seeds.
+- Real data: run on 3 then 9 sector ETFs once Shriker's pipeline lands.
+- Report the AUC distribution over 10 seeds for every model (matches the paper's plan).
+- Try K = 5 symbols with the big-move objective (does magnitude detail help?).
+- Train the symmetric builder (Abhinav) with the same objective and compare.
 - Note for the team: the circuit shape matters a lot; Abhinav's symmetric builder may train
   better than the generic one, which would itself be evidence for H2.

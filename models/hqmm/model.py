@@ -6,9 +6,10 @@ Works with any UnitaryBuilder: GenericBuilder gives Q-G, Abhinav's
 EquivariantBuilder gives Q-E. Uses the discretised symbols only.
 
 Defaults reflect what worked in the synthetic tests (docs/engine_notes.md):
-reset-mode measurement, 2 register qubits (4 regime states), L-BFGS training,
-several random restarts kept by validation likelihood, and the stress score =
-the model's predicted share of extreme moves for the next day.
+reset-mode measurement, 2 register qubits (4 regime states), L-BFGS training on
+the big-move pattern only (objective="coarse"), several random restarts kept by
+validation forecast skill (selection="skill"), and the stress score = the
+model's predicted share of extreme moves for the next day.
 """
 from __future__ import annotations
 
@@ -18,7 +19,7 @@ import numpy as np
 import torch
 
 from models.base import Fold, MarketData, RegimeModel
-from models.hqmm.engine import LBFGSConfig, run_filter, train_lbfgs
+from models.hqmm.engine import LBFGSConfig, run_filter, train_coarse, train_lbfgs, train_lbfgs_fast
 from models.hqmm.measurement import LocalMeasurement
 
 
@@ -31,14 +32,22 @@ class HQMMModel(RegimeModel):
 
     def __init__(self, builder_factory: Callable, K: int = 3, n_register: int = 2,
                  shared_measurement: bool = True, reset: bool = True,
-                 config: LBFGSConfig = LBFGSConfig(), n_restarts: int = 3, name: str = "hqmm"):
+                 config: LBFGSConfig = LBFGSConfig(), n_restarts: int = 3, name: str = "hqmm",
+                 objective: str = "coarse", selection: str = "skill"):
+        if objective not in ("coarse", "full"):
+            raise ValueError("objective must be 'coarse' or 'full'")
+        if selection not in ("skill", "loglik"):
+            raise ValueError("selection must be 'skill' or 'loglik'")
+        if objective == "coarse" and not reset:
+            raise ValueError("objective='coarse' needs reset=True")
+        self.objective, self.selection = objective, selection
         self.builder_factory = builder_factory
         self.K, self.n_register = K, n_register
         self.shared_measurement, self.reset = shared_measurement, reset
         self.config, self.n_restarts, self.name = config, n_restarts, name
         self.builder = self.measurement = None
-        self.val_loglik = None
-        self.restart_vals: list[float] = []
+        self.val_criterion = None
+        self.restart_vals: list[float] = []      # selection criterion of each restart
 
     # ------------------------------------------------------------------ RegimeModel API
     def fit(self, data: MarketData | None, symbols: np.ndarray, fold: Fold, seed: int) -> "HQMMModel":
@@ -51,11 +60,27 @@ class HQMMModel(RegimeModel):
             torch.manual_seed(s)
             builder = self.builder_factory(n)
             meas = LocalMeasurement(self.K, n_assets=n, shared=self.shared_measurement, reset=self.reset)
-            res = train_lbfgs(builder, meas, Y_train, Y_val, self.n_register, self.config, seed=s)
-            self.restart_vals.append(res.val_loglik)
-            if best is None or res.val_loglik > best[2]:
-                best = (builder, meas, res.val_loglik)
-        self.builder, self.measurement, self.val_loglik = best
+            if self.objective == "coarse":
+                res = train_coarse(builder, meas, Y_train, Y_val, self.n_register, self.config, seed=s)
+            elif self.reset:
+                res = train_lbfgs_fast(builder, meas, Y_train, Y_val, self.n_register, self.config, seed=s)
+            else:
+                res = train_lbfgs(builder, meas, Y_train, Y_val, self.n_register, self.config, seed=s)
+            if self.selection == "skill":
+                if "val_skill" in res.history[-1]:
+                    crit = res.history[-1]["val_skill"]
+                else:
+                    with torch.no_grad():
+                        f = run_filter(builder, meas, np.concatenate([Y_train, Y_val]), self.n_register, predict=True)
+                    from models.hqmm.engine import forecast_skill
+                    crit = forecast_skill(f.pred_extreme[0].numpy(), np.concatenate([Y_train, Y_val]),
+                                          self.K, np.arange(len(Y_train), len(Y_train) + len(Y_val)))
+            else:
+                crit = res.val_loglik
+            self.restart_vals.append(crit)
+            if best is None or crit > best[2]:
+                best = (builder, meas, crit)
+        self.builder, self.measurement, self.val_criterion = best
         return self
 
     def score(self, data: MarketData | None, symbols: np.ndarray, idx: np.ndarray) -> np.ndarray:

@@ -3,7 +3,7 @@
 Trains the generic HQMM (Q-G) on synthetic data, then checks its stress score
 on unseen test days against the hidden truth. Run from the repo root:
     python -m experiments.synthetic_recovery
-Takes a few minutes (3 restarts). Saves results/figures/synthetic_recovery.png
+Takes about 2 minutes (3 restarts, big-move objective). Saves results/figures/synthetic_recovery.png
 and logs to results/logs/runs.jsonl.
 """
 import os
@@ -40,12 +40,12 @@ def main():
     e = extreme_share(d.symbols, K)
     ref = np.array([e[max(0, t - 9): t + 1].mean() for t in range(len(e))])[fold.test_idx]
     auc_ref = roc_auc_score(truth, ref)
-    print(f"restart validation log-likelihoods: {np.round(model.restart_vals, 4)}")
+    print(f"restart validation forecast skills: {np.round(model.restart_vals, 3)}")
     print(f"test AUC  HQMM: {auc:.3f}   10-day extreme-share reference: {auc_ref:.3f}")
-    print(f"val loglik {model.val_loglik:.4f}  params {model.n_params()}  train time {train_s:.0f}s")
+    print(f"chosen restart skill {model.val_criterion:+.3f}  params {model.n_params()}  train time {train_s:.0f}s")
 
     log_run(model.name, 0, SEED, {"n": N_ASSETS, "K": K, "r": 2, "layers": 3, "restarts": RESTARTS},
-            {"auc": auc, "auc_reference": auc_ref, "val_loglik": model.val_loglik,
+            {"auc": auc, "auc_reference": auc_ref, "val_skill": model.val_criterion,
              "n_params": model.n_params(), "train_seconds": train_s}, author="Sarah")
 
     t = fold.test_idx

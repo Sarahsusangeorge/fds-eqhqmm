@@ -273,3 +273,55 @@ def test_hqmm_model_fit_score_is_causal():
     s2 = model.score(None, changed, fold.test_idx)
     np.testing.assert_allclose(s[:30], s2[:30])
     assert model.n_params() > 0
+
+
+def test_parallel_likelihood_matches_sequential_filter():
+    from models.hqmm.engine import filter_register, register_kraus_table, total_loglik
+    torch.manual_seed(7)
+    b = GenericBuilder(2, 3, layers=2, init_scale=1.0)
+    m = LocalMeasurement(3, n_assets=3, reset=True)
+    Y = torch.randint(0, 3, (777, 3))
+    with torch.no_grad():
+        table = register_kraus_table(b.build(), m.rows(), 2, 3)
+        seq = filter_register(table, Y, 2, 3).log_p[0]
+        for burn in (0, 20):
+            par = total_loglik(table, Y, 3, 2, burn_in=burn)
+            assert abs(par.item() - seq[burn:].sum().item()) < 1e-8
+
+
+def test_coarse_likelihood_sums_fine_probabilities():
+    """P(extreme pattern) must equal the sum of P(y) over all y with that pattern."""
+    from models.hqmm.engine import register_kraus_table, total_loglik, total_loglik_coarse
+    torch.manual_seed(8)
+    b = GenericBuilder(1, 2, layers=2, init_scale=1.0)
+    m = LocalMeasurement(3, n_assets=2, reset=True)
+    with torch.no_grad():
+        table = register_kraus_table(b.build(), m.rows(), 1, 2)
+        Yc = torch.tensor([[0, 1], [1, 1]])                  # pattern: [extreme, flat], [flat, flat]
+        coarse = total_loglik_coarse(table, Yc, 3, 1).exp().item()
+        fine = sum(total_loglik(table, torch.tensor([[a, 1], [1, 1]]), 3, 1).exp().item() for a in (0, 2))
+        assert abs(coarse - fine) < 1e-12
+
+
+def test_forecast_skill_detects_good_and_useless_forecasts():
+    from models.hqmm.engine import extreme_share, forecast_skill
+    rng = np.random.default_rng(0)
+    Y = rng.integers(0, 3, (300, 3))
+    e = extreme_share(Y, 3)
+    perfect = np.r_[e[1:], 0.5]                      # prediction made on day t = truth on day t+1
+    assert forecast_skill(perfect, Y, 3, np.arange(300)) > 0.99
+    assert forecast_skill(np.full(300, 0.6), Y, 3, np.arange(300)) == 0.0
+
+
+def test_model_coarse_objective_runs_and_selects():
+    from models.base import Fold
+    from models.hqmm.engine import LBFGSConfig
+    from models.hqmm.model import HQMMModel
+    from synthetic.generate import make_synthetic
+    d = make_synthetic(T=300, n=2, K=3, seed=5)
+    fold = Fold(0, np.arange(200), np.arange(200, 250), np.arange(250, 300))
+    model = HQMMModel(lambda n: GenericBuilder(1, n, layers=1), n_register=1, n_restarts=2,
+                      config=LBFGSConfig(rounds=2, max_iter=5)).fit(None, d.symbols, fold, seed=0)
+    assert len(model.restart_vals) == 2 and model.val_criterion == max(model.restart_vals)
+    s = model.score(None, d.symbols, fold.test_idx)
+    assert s.shape == (50,) and np.all((s >= 0) & (s <= 1))
