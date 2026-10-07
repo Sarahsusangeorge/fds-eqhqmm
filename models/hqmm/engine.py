@@ -392,3 +392,186 @@ def train_lbfgs(builder, measurement, Y_train: np.ndarray, Y_val: np.ndarray, n_
             break
         prev = loss
     return TrainResult(history[-1]["val_loglik"], history)
+
+
+# --------------------------------------------------------------------------- fast total likelihood (training)
+def _superoperators(table: torch.Tensor) -> torch.Tensor:
+    """S_y = A_y (x) conj(A_y): acts on row-major vec(rho) as vec(A rho A^dag). (K^n, dR^2, dR^2)."""
+    k, dR, _ = table.shape
+    return torch.einsum("yij,ykl->yikjl", table, table.conj()).reshape(k, dR * dR, dR * dR)
+
+
+def _log_product(S: torch.Tensor):
+    """Product S[T-1] @ ... @ S[0] by pairwise (tree) multiplication with rescaling.
+
+    Returns (P, log_scale) with the true product = exp(log_scale) * P.
+    About log2(T) batched matrix multiplications instead of T sequential steps.
+    """
+    log_scale = torch.zeros((), dtype=torch.float64)
+    eye = torch.eye(S.shape[-1], dtype=S.dtype)
+    while S.shape[0] > 1:
+        if S.shape[0] % 2:
+            S = torch.cat([S, eye[None]], 0)
+        S = S[1::2] @ S[0::2]                                  # later day on the left
+        norms = torch.linalg.matrix_norm(S).clamp_min(_TINY)
+        S = S / norms[:, None, None].to(S.dtype)
+        log_scale = log_scale + torch.log(norms).sum()
+    return S[0], log_scale
+
+
+def total_loglik(table: torch.Tensor, Y, K: int, n_register: int, burn_in: int = 0) -> torch.Tensor:
+    """log p(y_{burn_in+1..T} | y_{1..burn_in}) for one sequence, computed in parallel.
+
+    Equals the sum of filter_register's per-day log_p over days >= burn_in.
+    """
+    Y = torch.as_tensor(Y, dtype=torch.long)
+    dR = 2 ** n_register
+    S = _superoperators(table)[joint_index(Y, K)]              # (T, dR^2, dR^2)
+    rho0 = (torch.eye(dR, dtype=CDTYPE) / dR).reshape(-1)
+    tr = torch.eye(dR, dtype=CDTYPE).reshape(-1)               # vec(I): trace of a vec'd matrix
+
+    def log_prob(Sseq):
+        P, ls = _log_product(Sseq)
+        return torch.log((tr @ (P @ rho0)).real.clamp_min(_TINY)) + ls
+
+    full = log_prob(S)
+    return full - log_prob(S[:burn_in]) if burn_in > 0 else full
+
+
+def train_lbfgs_fast(builder, measurement, Y_train: np.ndarray, Y_val: np.ndarray, n_register: int,
+                     config: LBFGSConfig = LBFGSConfig(), seed: int = 0) -> TrainResult:
+    """Same as train_lbfgs (reset mode only) but with the parallel likelihood: much faster."""
+    if not getattr(measurement, "reset", False):
+        raise ValueError("train_lbfgs_fast needs a reset-mode measurement")
+    torch.manual_seed(seed)
+    n = Y_train.shape[1]
+    params = list(builder.parameters()) + list(measurement.parameters())
+    opt = torch.optim.LBFGS(params, lr=1, max_iter=config.max_iter, history_size=20,
+                            line_search_fn="strong_wolfe")
+    Yt = torch.as_tensor(Y_train, dtype=torch.long)
+    n_scored = len(Y_train) - config.burn_in
+    Y_all = torch.as_tensor(np.concatenate([Y_train, Y_val]), dtype=torch.long)
+
+    def closure():
+        opt.zero_grad()
+        table = register_kraus_table(builder.build(), measurement.rows(), n_register, n)
+        loss = -total_loglik(table, Yt, measurement.K, n_register, config.burn_in) / n_scored
+        loss.backward()
+        return loss
+
+    history, prev = [], np.inf
+    for rnd in range(config.rounds):
+        loss = opt.step(closure).item()
+        with torch.no_grad():
+            table = register_kraus_table(builder.build(), measurement.rows(), n_register, n)
+            val = ((total_loglik(table, Y_all, measurement.K, n_register)
+                    - total_loglik(table, Yt, measurement.K, n_register)) / len(Y_val)).item()
+        history.append({"round": rnd, "train_loss": loss, "val_loglik": val})
+        if config.verbose:
+            print(f"round {rnd:2d}  train -loglik {loss:.4f}  val loglik {val:.4f}", flush=True)
+        if prev - loss < config.tol:
+            break
+        prev = loss
+    return TrainResult(history[-1]["val_loglik"], history)
+
+
+# --------------------------------------------------------------------------- coarse (big-move-only) likelihood
+def coarse_superoperators(table: torch.Tensor, K: int, n_assets: int) -> torch.Tensor:
+    """Superoperators for the coarse observation 'which assets had an extreme move'.
+
+    Sums S_y over all joint symbols y with the same extreme/not-extreme pattern,
+    i.e. the same quantum model observed with direction information removed.
+    Output (2^n, dR^2, dR^2), indexed like joint_index of the 0/1 pattern with base 2.
+    """
+    S = _superoperators(table)
+    grids = torch.cartesian_prod(*[torch.arange(K)] * n_assets) if n_assets > 1 else torch.arange(K)[:, None]
+    pattern = joint_index(((grids == 0) | (grids == K - 1)).long(), 2)          # (K^n,)
+    out = torch.zeros((2 ** n_assets,) + S.shape[1:], dtype=S.dtype)
+    return out.index_add(0, pattern, S)
+
+
+def total_loglik_coarse(table: torch.Tensor, Y, K: int, n_register: int, burn_in: int = 0) -> torch.Tensor:
+    """Like total_loglik, but only for the extreme / not-extreme pattern of each day."""
+    Y = torch.as_tensor(Y, dtype=torch.long)
+    n = Y.shape[-1]
+    dR = 2 ** n_register
+    flags = ((Y == 0) | (Y == K - 1)).long()
+    S = coarse_superoperators(table, K, n)[joint_index(flags, 2)]
+    rho0 = (torch.eye(dR, dtype=CDTYPE) / dR).reshape(-1)
+    tr = torch.eye(dR, dtype=CDTYPE).reshape(-1)
+
+    def log_prob(Sseq):
+        P, ls = _log_product(Sseq)
+        return torch.log((tr @ (P @ rho0)).real.clamp_min(_TINY)) + ls
+
+    full = log_prob(S)
+    return full - log_prob(S[:burn_in]) if burn_in > 0 else full
+
+
+def pretrain_coarse(builder, measurement, Y_train: np.ndarray, n_register: int,
+                    rounds: int = 8, max_iter: int = 20, burn_in: int = 20) -> list:
+    """Stage 1: fit on big-move patterns only, so the register learns volatility memory
+    instead of the day's direction. Returns the training-loss history."""
+    n = Y_train.shape[1]
+    params = list(builder.parameters()) + list(measurement.parameters())
+    opt = torch.optim.LBFGS(params, lr=1, max_iter=max_iter, history_size=20, line_search_fn="strong_wolfe")
+    Yt = torch.as_tensor(Y_train, dtype=torch.long)
+
+    def closure():
+        opt.zero_grad()
+        table = register_kraus_table(builder.build(), measurement.rows(), n_register, n)
+        loss = -total_loglik_coarse(table, Yt, measurement.K, n_register, burn_in) / (len(Yt) - burn_in)
+        loss.backward()
+        return loss
+
+    hist, prev = [], np.inf
+    for _ in range(rounds):
+        loss = opt.step(closure).item()
+        hist.append(loss)
+        if prev - loss < 1e-6:
+            break
+        prev = loss
+    return hist
+
+
+def forecast_skill(pred_extreme: np.ndarray, Y: np.ndarray, K: int, idx: np.ndarray) -> float:
+    """Label-free quality check: correlation between the prediction made on day t and the
+    actual share of extreme moves on day t+1, over days t in idx (t+1 must exist).
+
+    Used to choose among random restarts: in synthetic tests it tracked regime-detection
+    quality (Spearman 0.77 with AUC) far better than validation likelihood (0.14).
+    """
+    idx = np.asarray(idx)
+    idx = idx[idx + 1 < len(Y)]
+    e = extreme_share(Y, K)
+    p, a = pred_extreme[idx], e[idx + 1]
+    if p.std() < 1e-12 or a.std() < 1e-12:
+        return 0.0
+    return float(np.corrcoef(p, a)[0, 1])
+
+
+def train_coarse(builder, measurement, Y_train: np.ndarray, Y_val: np.ndarray, n_register: int,
+                 config: LBFGSConfig = LBFGSConfig(), seed: int = 0) -> TrainResult:
+    """Fit on big-move patterns only (direction removed). Default training objective.
+
+    Why: with direction included, training was dominated by "everyone moved up / down
+    together today" and usually missed the volatility memory (synthetic test AUC 0.36-0.79).
+    With this objective every start reached 0.74-0.81. Reports validation forecast skill
+    in history[-1]["val_skill"] for choosing between restarts.
+    """
+    torch.manual_seed(seed)
+    hist = pretrain_coarse(builder, measurement, Y_train, n_register, rounds=config.rounds,
+                           max_iter=config.max_iter, burn_in=config.burn_in)
+    Y_all = np.concatenate([Y_train, Y_val])
+    with torch.no_grad():
+        f = run_filter(builder, measurement, Y_all, n_register, predict=True)
+        table = register_kraus_table(builder.build(), measurement.rows(), n_register, Y_train.shape[1])
+        val_ll = ((total_loglik_coarse(table, Y_all, measurement.K, n_register)
+                   - total_loglik_coarse(table, Y_train, measurement.K, n_register)) / len(Y_val)).item()
+    skill = forecast_skill(f.pred_extreme[0].numpy(), Y_all, measurement.K,
+                           np.arange(len(Y_train), len(Y_all)))
+    history = [{"round": i, "train_loss": l} for i, l in enumerate(hist)]
+    history[-1].update({"val_loglik_coarse": val_ll, "val_skill": skill})
+    if config.verbose:
+        print(f"coarse fit: train -loglik {hist[-1]:.4f}  val loglik {val_ll:.4f}  val skill {skill:+.3f}")
+    return TrainResult(val_ll, history)
