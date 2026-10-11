@@ -16,10 +16,14 @@ volatility would hide exactly the volatility jumps we want to detect.
 from __future__ import annotations
 
 import os
+import sys
 import time
 
 import numpy as np
 import pandas as pd
+
+# run as `python experiments/hqmm_first_real.py` from anywhere: make the repo root importable
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 TICKERS = ["XLF", "XLK", "XLE"]
 START, END = "1999-01-01", "2011-01-01"
@@ -34,8 +38,22 @@ def download_prices(tickers=TICKERS, start=START, end=END, cache=RAW_CACHE) -> p
     if os.path.exists(cache):
         return pd.read_csv(cache, index_col=0, parse_dates=True)
     import yfinance as yf
-    px = yf.download(tickers, start=start, end=end, auto_adjust=True, progress=False)["Close"]
-    px = px[tickers].dropna()
+    cols = {}
+    for t in tickers:  # one ticker at a time, with retries: parallel downloads can hit "database is locked"
+        for attempt in range(4):
+            try:
+                df = yf.download(t, start=start, end=end, auto_adjust=True, progress=False, threads=False)
+                close = df["Close"]
+                close = close.iloc[:, 0] if hasattr(close, "columns") else close
+                if len(close.dropna()) > 0:
+                    cols[t] = close
+                    break
+            except Exception as e:  # noqa: BLE001
+                print(f"{t}: attempt {attempt + 1} failed ({type(e).__name__}); retrying")
+            time.sleep(2 * (attempt + 1))
+        else:
+            raise RuntimeError(f"could not download {t}; check your internet connection and retry")
+    px = pd.DataFrame(cols)[tickers].dropna()
     os.makedirs(os.path.dirname(cache), exist_ok=True)
     px.to_csv(cache)
     return px
