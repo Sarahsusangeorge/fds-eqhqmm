@@ -164,14 +164,34 @@ class EquivariantBuilder(nn.Module, UnitaryBuilder):
         self.n_register = n_register
         self.n_assets = n_assets
         self.layers = layers
-        gens = symmetric_generators(n_assets, n_register)
-        self.n_generators = len(gens)
-        # Store generators as a stacked buffer (n_gen, d, d)
-        self.register_buffer("generators", torch.stack(gens, dim=0))
+        # 4^r register Paulis x (5 asset operators, or 3 for a single asset). The dense
+        # (2^q x 2^q) generators are built only if build() is called (see `generators`), so
+        # build_columns() works for baskets whose dense matrices would not fit in memory.
+        self.n_generators = 4**n_register * (5 if n_assets >= 2 else 3)
+        self._generators_cache = None
         self.theta = nn.Parameter(
             init_scale * torch.randn(layers, self.n_generators, dtype=FDTYPE)
         )
         self.time_varying = False
+        self._n_asset_ops = 5 if n_assets >= 2 else 3
+        # projectors (I +- B)/2 for every register Pauli string B, in generator order
+        self.register_buffer(
+            "_proj",
+            torch.stack(
+                [torch.stack([(torch.eye(2**n_register, dtype=CDTYPE) + sgn * B) / 2 for sgn in (1, -1)])
+                 for B in register_paulis(n_register)]
+            ),
+        )  # (4^r, 2, dR, dR)
+        self._dicke = None
+
+    @property
+    def generators(self) -> torch.Tensor:
+        """Dense stacked generators (n_gen, 2^q, 2^q), built on first use."""
+        if self._generators_cache is None:
+            gens = symmetric_generators(self.n_assets, self.n_register)
+            assert len(gens) == self.n_generators
+            self._generators_cache = torch.stack(gens, dim=0)
+        return self._generators_cache
 
     def n_params(self) -> int:
         return self.theta.numel()
@@ -187,6 +207,68 @@ class EquivariantBuilder(nn.Module, UnitaryBuilder):
                 Ug = torch.matrix_exp(-1j * th * G)
                 V = Ug @ V
         return V
+
+    # ------------------------------------------------------------------------------------------
+    # Fast path for reset mode (engine.unitary_columns): only the columns of V whose asset qubits
+    # start in |0...0> are needed. That state is symmetric under asset permutations and V commutes
+    # with every permutation, so the evolution never leaves the symmetric subspace, which has only
+    # n+1 dimensions (Dicke states with k assets "excited"). Every asset operator is then a small
+    # (n+1) x (n+1) matrix, so the exact result costs almost nothing, however many assets.
+    # ------------------------------------------------------------------------------------------
+    def _dicke_operators(self):
+        """The five asset operators restricted to the symmetric subspace, as (n+1)x(n+1) matrices."""
+        n = self.n_assets
+        k = torch.arange(n + 1, dtype=FDTYPE)
+        s = torch.sqrt((k[:-1] + 1) * (n - k[:-1]))            # <k+1| sum X |k>
+        X = torch.zeros(n + 1, n + 1, dtype=CDTYPE)
+        Y = torch.zeros(n + 1, n + 1, dtype=CDTYPE)
+        idx = torch.arange(n)
+        X[idx + 1, idx] = s.to(CDTYPE)
+        X[idx, idx + 1] = s.to(CDTYPE)
+        Y[idx + 1, idx] = 1j * s.to(CDTYPE)                    # Y|0> = i|1>
+        Y[idx, idx + 1] = -1j * s.to(CDTYPE)                   # Y|1> = -i|0>
+        Z = torch.diag((n - 2 * k).to(CDTYPE))
+        ops = [X, Y, Z]
+        if n >= 2:
+            ops += [(Z @ Z - n * torch.eye(n + 1, dtype=CDTYPE)) / 2,
+                    0.5 * (X @ X + Y @ Y) - n * torch.eye(n + 1, dtype=CDTYPE)]
+        return ops
+
+    def build_columns(self, theta=None, step_inputs=None) -> torch.Tensor:
+        """Columns of V(theta) whose asset qubits start in |0...0>, shape (2^q, 2^r).
+
+        Equal to build()[:, arange(2^r) * 2^n] (build() itself is only accurate to about 1e-10)
+        but never forms the 2^q x 2^q matrices.
+        """
+        theta = self.theta if theta is None else theta
+        n, dR = self.n_assets, 2**self.n_register
+        if getattr(self, "_dicke", None) is None:
+            eig = []
+            for A in self._dicke_operators():
+                lam, U = torch.linalg.eigh(A)
+                eig.append((lam, U.to(CDTYPE)))
+            self._dicke = eig
+        # state W[register out, Dicke k, register in]; start: register |x>, assets |0..0> (k = 0)
+        W = torch.zeros(dR, n + 1, dR, dtype=CDTYPE)
+        W[torch.arange(dR), 0, torch.arange(dR)] = 1
+        for layer in range(self.layers):
+            for g in range(self.n_generators):
+                b, a = divmod(g, self._n_asset_ops)
+                lam, U = self._dicke[a]
+                t = theta[layer, g]
+                out = 0
+                for sgn, proj in zip((1, -1), self._proj[b]):
+                    phase = torch.exp(torch.complex(torch.zeros_like(lam), -sgn * t * lam))
+                    Ut = (U * phase) @ U.conj().T                     # exp(-i sgn t A), (n+1)x(n+1)
+                    out = out + torch.einsum("rs,ka,sac->rkc", proj, Ut, W)
+                W = out
+        # expand Dicke amplitudes to the 2^n asset basis: |D_k> = sum_{|x|=k} |x> / sqrt(C(n,k))
+        idx = torch.arange(2**n)
+        k_of = sum(((idx >> j) & 1) for j in range(n))
+        binom = torch.tensor([math.comb(n, int(k)) for k in range(n + 1)], dtype=FDTYPE)
+        weights = (1 / torch.sqrt(binom))[k_of].to(CDTYPE)             # (2^n,)
+        full = W[:, k_of, :] * weights[None, :, None]                  # (dR, 2^n, dR)
+        return full.reshape(dR * 2**n, dR)
 
 
 class CorrWeightedBuilder(nn.Module, UnitaryBuilder):
