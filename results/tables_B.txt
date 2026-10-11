@@ -1,0 +1,99 @@
+
+Table 2. Detection results (pooled over folds)
+     model  params  rec_R1  rec_R2  rec_R3  rec_R4  lag_R2  far  auprc_R1  auprc_R2  auprc_R3  auprc_R4  d_R2  no_alarm_folds
+       C-G     110    0.00    0.38    0.50    0.56   -6.33 0.83      0.67      0.14      0.47      0.44 -0.56              25
+       C-E       8    0.00    0.19    0.25    0.22   -3.33 0.68      0.66      0.16      0.47      0.43 -0.48              31
+   C-E-cat       6    0.50    0.50    0.75    0.56    4.25 0.64      0.61      0.17      0.61      0.45 -0.08              24
+  Hamilton       6    0.50    0.81    1.00    0.67   -4.09 0.32      0.56      0.50      0.92      0.72  1.07              27
+     BOCPD       2    0.25    0.38    0.50    0.56   -3.83 0.50      0.59      0.32      0.69      0.65 -0.05              27
+     GARCH       4    0.50    0.88    1.00    0.67   -4.18 0.27      0.59      0.74      0.99      0.67  1.97              27
+Absorption       0    0.50    0.38    0.50    0.33   -0.67 1.23      0.35      0.25      0.70      0.25  0.62               6
+      Eig1       0    0.50    0.31    0.25    0.22   -5.40 1.14      0.34      0.24      0.63      0.25  0.56               7
+        RF    6407    0.25    0.75    0.75    0.44   -5.60 0.27      0.64      0.84      0.89      0.37  2.36              28
+       XGB    1810    0.38    0.69    0.50    0.33   -3.72 0.46      0.56      0.81      0.84      0.45  2.60              24
+
+Risk-off overlay vs buy and hold (mean over folds)
+       model  cost_bps  sharpe  max_drawdown  turnover_per_yr
+buy and hold         0    0.68          0.12             0.00
+         C-G         5    0.68          0.12             2.57
+         C-G        10    0.67          0.12             2.57
+         C-G        25    0.65          0.12             2.57
+         C-E         5    0.68          0.12             1.83
+         C-E        10    0.68          0.12             1.83
+         C-E        25    0.65          0.12             1.83
+     C-E-cat         5    0.66          0.12             2.28
+     C-E-cat        10    0.65          0.12             2.28
+     C-E-cat        25    0.63          0.12             2.28
+    Hamilton         5    0.66          0.11             6.18
+    Hamilton        10    0.64          0.11             6.18
+    Hamilton        25    0.60          0.11             6.18
+       BOCPD         5    0.68          0.11             2.29
+       BOCPD        10    0.68          0.11             2.29
+       BOCPD        25    0.66          0.12             2.29
+       GARCH         5    0.44          0.10             5.15
+       GARCH        10    0.43          0.10             5.15
+       GARCH        25    0.38          0.10             5.15
+  Absorption         5    0.41          0.03             3.47
+  Absorption        10    0.32          0.03             3.47
+  Absorption        25    0.09          0.04             3.47
+        Eig1         5    0.42          0.04             2.97
+        Eig1        10    0.34          0.04             2.97
+        Eig1        25    0.14          0.04             2.97
+          RF         5    0.37          0.11             5.10
+          RF        10    0.35          0.11             5.10
+          RF        25    0.30          0.11             5.10
+         XGB         5    0.44          0.12             5.18
+         XGB        10    0.43          0.12             5.18
+         XGB        25    0.38          0.12             5.18
+
+Table 5. Cost
+     model  params  fit_score_sec_per_fold  total_min
+       C-G     110                    0.40       0.30
+       C-E       8                    0.72       0.53
+   C-E-cat       6                    1.93       1.42
+  Hamilton       6                    0.91       0.67
+     BOCPD       2                    0.55       0.41
+     GARCH       4                    0.02       0.01
+Absorption       0                    0.04       0.03
+      Eig1       0                    0.04       0.03
+        RF    6407                    0.32       0.24
+       XGB    1810                    0.04       0.03
+
+Paired Wilcoxon on per-fold AUPRC vs reference (Holm-corrected)
+reference   metric      model  n_folds  mean_diff  p_raw  p_holm
+      C-G auprc_R4        C-E       11       0.01   0.24    1.00
+      C-G auprc_R4    C-E-cat       11       0.05   0.24    1.00
+      C-G auprc_R4   Hamilton       11       0.24   0.02    0.15
+      C-G auprc_R4      BOCPD       11       0.22   0.01    0.12
+      C-G auprc_R4      GARCH       11       0.22   0.03    0.23
+      C-G auprc_R4 Absorption       11       0.01   0.97    1.00
+      C-G auprc_R4       Eig1       11       0.00   0.97    1.00
+      C-G auprc_R4         RF       11       0.02   0.90    1.00
+      C-G auprc_R4        XGB       11       0.07   0.41    1.00
+      C-G auprc_R1        C-E       12       0.00   0.68    1.00
+      C-G auprc_R1    C-E-cat       12       0.02   0.62    1.00
+      C-G auprc_R1   Hamilton       12       0.01   1.00    1.00
+      C-G auprc_R1      BOCPD       12      -0.02   0.57    1.00
+      C-G auprc_R1      GARCH       12       0.01   0.97    1.00
+      C-G auprc_R1 Absorption       12      -0.11   0.13    1.00
+      C-G auprc_R1       Eig1       12      -0.11   0.13    1.00
+      C-G auprc_R1         RF       12      -0.01   0.97    1.00
+      C-G auprc_R1        XGB       12      -0.05   0.38    1.00
+      C-E auprc_R4        C-G       11      -0.01   0.24    1.00
+      C-E auprc_R4    C-E-cat       11       0.03   0.37    1.00
+      C-E auprc_R4   Hamilton       11       0.23   0.01    0.12
+      C-E auprc_R4      BOCPD       11       0.20   0.01    0.12
+      C-E auprc_R4      GARCH       11       0.21   0.02    0.17
+      C-E auprc_R4 Absorption       11      -0.01   0.97    1.00
+      C-E auprc_R4       Eig1       11      -0.01   0.90    1.00
+      C-E auprc_R4         RF       11       0.00   0.76    1.00
+      C-E auprc_R4        XGB       11       0.06   0.52    1.00
+      C-E auprc_R1        C-G       12      -0.00   0.68    1.00
+      C-E auprc_R1    C-E-cat       12       0.02   0.68    1.00
+      C-E auprc_R1   Hamilton       12       0.01   0.91    1.00
+      C-E auprc_R1      BOCPD       12      -0.02   0.57    1.00
+      C-E auprc_R1      GARCH       12       0.01   0.97    1.00
+      C-E auprc_R1 Absorption       12      -0.11   0.09    0.83
+      C-E auprc_R1       Eig1       12      -0.11   0.09    0.83
+      C-E auprc_R1         RF       12      -0.01   1.00    1.00
+      C-E auprc_R1        XGB       12      -0.05   0.30    1.00
