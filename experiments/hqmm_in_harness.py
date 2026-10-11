@@ -25,6 +25,7 @@ from models.hqmm.engine import LBFGSConfig
 from models.hqmm.equivariant import EquivariantBuilder
 from models.hqmm.generic import GenericBuilder, matched_layers
 from models.hqmm.model import HQMMModel
+from models.hqmm.symbols import train_vol_transform
 from models.oom.spectral import SpectralOOM
 from tests.helpers import fake_market
 
@@ -51,16 +52,6 @@ def hqmm_generic_matched(n_params=160, name="Q-G(matched)/train-vol-symbols"):
     """Generic HQMM with about as many gate parameters as the equivariant one (fair H2 test)."""
     return HQMMModel(lambda n: GenericBuilder(2, n, layers=matched_layers(n_params, 2, n)), name=name,
                      n_restarts=2, shared_measurement=False, symbol_mode="train_vol", config=LBFGSConfig())
-
-
-def train_vol_transform(md):
-    """Same symbols the HQMM builds in 'train_vol' mode, so classical models can be given them too."""
-    def f(symbols, fold, seed):
-        scale = md.returns[fold.train_idx].std(axis=0, keepdims=True)
-        z = md.returns / scale
-        thr = np.quantile((md.returns[fold.window_idx] / scale).ravel(), [0.2, 0.8])
-        return np.digitize(z, thr).astype(int)
-    return f
 
 
 def main():
