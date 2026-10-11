@@ -33,14 +33,17 @@ class HQMMModel(RegimeModel):
     def __init__(self, builder_factory: Callable, K: int = 3, n_register: int = 2,
                  shared_measurement: bool = True, reset: bool = True,
                  config: LBFGSConfig = LBFGSConfig(), n_restarts: int = 3, name: str = "hqmm",
-                 objective: str = "coarse", selection: str = "skill"):
+                 objective: str = "coarse", selection: str = "skill", symbol_mode: str = "harness"):
         if objective not in ("coarse", "full"):
             raise ValueError("objective must be 'coarse' or 'full'")
         if selection not in ("skill", "loglik"):
             raise ValueError("selection must be 'skill' or 'loglik'")
         if objective == "coarse" and not reset:
             raise ValueError("objective='coarse' needs reset=True")
-        self.objective, self.selection = objective, selection
+        if symbol_mode not in ("harness", "train_vol"):
+            raise ValueError("symbol_mode must be 'harness' or 'train_vol'")
+        self.objective, self.selection, self.symbol_mode = objective, selection, symbol_mode
+        self._scale = self._thresholds = None
         self.builder_factory = builder_factory
         self.K, self.n_register = K, n_register
         self.shared_measurement, self.reset = shared_measurement, reset
@@ -50,8 +53,30 @@ class HQMMModel(RegimeModel):
         self.restart_vals: list[float] = []      # selection criterion of each restart
 
     # ------------------------------------------------------------------ RegimeModel API
+    def _symbols(self, data, symbols):
+        """Symbols the model actually uses.
+
+        'harness': the symbols the harness passes in (built from trailing-volatility
+        standardised returns). 'train_vol': built here from raw returns scaled by the
+        TRAINING-window volatility; this keeps the volatility jump of a crash visible
+        (trailing-volatility scaling cancels it, see docs/engine_notes.md).
+        """
+        if self.symbol_mode == "harness":
+            return np.asarray(symbols)
+        z = data.returns / self._scale
+        return np.digitize(z, self._thresholds).astype(int)
+
+    def _fit_symbols(self, data, fold):
+        window = np.concatenate([fold.train_idx, fold.val_idx])
+        self._scale = data.returns[fold.train_idx].std(axis=0, keepdims=True)
+        z = data.returns[window] / self._scale
+        shares = np.cumsum([0.2, 0.6, 0.2][: self.K - 1]) if self.K == 3 else np.linspace(0, 1, self.K + 1)[1:-1]
+        self._thresholds = np.quantile(z.ravel(), shares)
+
     def fit(self, data: MarketData | None, symbols: np.ndarray, fold: Fold, seed: int) -> "HQMMModel":
-        Y = np.asarray(symbols)
+        if self.symbol_mode == "train_vol":
+            self._fit_symbols(data, fold)
+        Y = self._symbols(data, symbols)
         n = Y.shape[1]
         Y_train, Y_val = Y[fold.train_idx], Y[fold.val_idx]
         best, self.restart_vals = None, []
@@ -86,7 +111,7 @@ class HQMMModel(RegimeModel):
     def score(self, data: MarketData | None, symbols: np.ndarray, idx: np.ndarray) -> np.ndarray:
         """Predicted share of extreme moves for the next day, known at the end of each day in idx."""
         idx = np.asarray(idx)
-        return self._filter(np.asarray(symbols)[: idx.max() + 1]).pred_extreme[0].numpy()[idx]
+        return self._filter(self._symbols(data, symbols)[: idx.max() + 1]).pred_extreme[0].numpy()[idx]
 
     def n_params(self) -> int:
         if self.builder is None:
@@ -94,15 +119,15 @@ class HQMMModel(RegimeModel):
         return self.builder.n_params() + self.measurement.n_params()
 
     # ------------------------------------------------------------------ extras
-    def posterior(self, symbols: np.ndarray, idx: np.ndarray) -> np.ndarray:
+    def posterior(self, data: MarketData | None, symbols: np.ndarray, idx: np.ndarray) -> np.ndarray:
         """Register-state probabilities (len(idx), 2^r) using only data up to each day."""
         idx = np.asarray(idx)
-        return self._filter(np.asarray(symbols)[: idx.max() + 1]).posterior[0].numpy()[idx]
+        return self._filter(self._symbols(data, symbols)[: idx.max() + 1]).posterior[0].numpy()[idx]
 
-    def surprise(self, symbols: np.ndarray, idx: np.ndarray) -> np.ndarray:
+    def surprise(self, data: MarketData | None, symbols: np.ndarray, idx: np.ndarray) -> np.ndarray:
         """-log p(y_t | past) on each day in idx (secondary alarm score)."""
         idx = np.asarray(idx)
-        return (-self._filter(np.asarray(symbols)[: idx.max() + 1]).log_p[0]).numpy()[idx]
+        return (-self._filter(self._symbols(data, symbols)[: idx.max() + 1]).log_p[0]).numpy()[idx]
 
     def _filter(self, Y):
         with torch.no_grad():

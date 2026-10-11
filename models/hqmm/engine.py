@@ -290,6 +290,15 @@ def reset_start_state(n_register: int, n_assets: int, batch: int = 1) -> torch.T
     return torch.kron(torch.eye(dR, dtype=CDTYPE) / dR, zero).expand(batch, dR * dA, dR * dA).clone()
 
 
+def unitary_columns(builder):
+    """What reset mode needs from V: only its columns with the assets in |0...0>.
+
+    Builders that can compute those directly (build_columns, shape (2^q, 2^r)) avoid
+    forming the full (2^q x 2^q) matrix, which is what limited the basket size.
+    """
+    return builder.build_columns() if hasattr(builder, "build_columns") else builder.build()
+
+
 def register_kraus_table(V: torch.Tensor, R: torch.Tensor, n_register: int, n_assets: int) -> torch.Tensor:
     """Reset mode: the register-only Kraus operators A_y, shape (K^n, dR, dR).
 
@@ -302,7 +311,10 @@ def register_kraus_table(V: torch.Tensor, R: torch.Tensor, n_register: int, n_as
     Rs = R[None].expand(n_assets, *R.shape) if R.dim() == 2 else R      # (n, K, 2)
     K = Rs.shape[1]
     # columns of V whose asset input is |0...0>: (dR_out, 2,...,2, dR_in)
-    W = V.reshape(dR, 2 ** n_assets, dR, 2 ** n_assets)[..., 0]
+    if V.shape[0] == V.shape[1]:                       # full unitary
+        W = V.reshape(dR, 2 ** n_assets, dR, 2 ** n_assets)[..., 0]
+    else:                                              # already just those columns, (2^q, dR_in)
+        W = V.reshape(dR, 2 ** n_assets, dR)
     W = W.reshape((dR,) + (2,) * n_assets + (dR,))
     for i in range(n_assets):
         W = torch.movedim(W, 1 + i, -1)                                  # bring asset i axis last
@@ -350,7 +362,7 @@ def run_filter(builder, measurement, Y, n_register: int, predict: bool = False) 
     Y = torch.as_tensor(Y, dtype=torch.long)
     n = Y.shape[-1]
     if getattr(measurement, "reset", False):
-        table = register_kraus_table(builder.build(), measurement.rows(), n_register, n)
+        table = register_kraus_table(unitary_columns(builder), measurement.rows(), n_register, n)
         return filter_register(table, Y, n_register, measurement.K, predict)
     return filter_sequence(builder.build(), measurement.operators(), Y, n_register, predict=predict)
 
@@ -454,7 +466,7 @@ def train_lbfgs_fast(builder, measurement, Y_train: np.ndarray, Y_val: np.ndarra
 
     def closure():
         opt.zero_grad()
-        table = register_kraus_table(builder.build(), measurement.rows(), n_register, n)
+        table = register_kraus_table(unitary_columns(builder), measurement.rows(), n_register, n)
         loss = -total_loglik(table, Yt, measurement.K, n_register, config.burn_in) / n_scored
         loss.backward()
         return loss
@@ -463,7 +475,7 @@ def train_lbfgs_fast(builder, measurement, Y_train: np.ndarray, Y_val: np.ndarra
     for rnd in range(config.rounds):
         loss = opt.step(closure).item()
         with torch.no_grad():
-            table = register_kraus_table(builder.build(), measurement.rows(), n_register, n)
+            table = register_kraus_table(unitary_columns(builder), measurement.rows(), n_register, n)
             val = ((total_loglik(table, Y_all, measurement.K, n_register)
                     - total_loglik(table, Yt, measurement.K, n_register)) / len(Y_val)).item()
         history.append({"round": rnd, "train_loss": loss, "val_loglik": val})
@@ -519,7 +531,7 @@ def pretrain_coarse(builder, measurement, Y_train: np.ndarray, n_register: int,
 
     def closure():
         opt.zero_grad()
-        table = register_kraus_table(builder.build(), measurement.rows(), n_register, n)
+        table = register_kraus_table(unitary_columns(builder), measurement.rows(), n_register, n)
         loss = -total_loglik_coarse(table, Yt, measurement.K, n_register, burn_in) / (len(Yt) - burn_in)
         loss.backward()
         return loss
@@ -565,7 +577,7 @@ def train_coarse(builder, measurement, Y_train: np.ndarray, Y_val: np.ndarray, n
     Y_all = np.concatenate([Y_train, Y_val])
     with torch.no_grad():
         f = run_filter(builder, measurement, Y_all, n_register, predict=True)
-        table = register_kraus_table(builder.build(), measurement.rows(), n_register, Y_train.shape[1])
+        table = register_kraus_table(unitary_columns(builder), measurement.rows(), n_register, Y_train.shape[1])
         val_ll = ((total_loglik_coarse(table, Y_all, measurement.K, n_register)
                    - total_loglik_coarse(table, Y_train, measurement.K, n_register)) / len(Y_val)).item()
     skill = forecast_skill(f.pred_extreme[0].numpy(), Y_all, measurement.K,
