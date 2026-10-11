@@ -44,6 +44,13 @@ def cz_ring_diagonal(n_qubits: int) -> torch.Tensor:
         sign = sign * (1 - 2 * (bits[a] & bits[b])).to(torch.float64)
     return sign.to(CDTYPE)
 
+def _apply_gate(S: torch.Tensor, G: torch.Tensor, k: int, q: int) -> torch.Tensor:
+    """Apply the 2x2 gate G to qubit k of S, where S has shape (2^q, c)."""
+    T = S.reshape((2,) * q + (S.shape[-1],))
+    T = torch.movedim(torch.tensordot(G, T, dims=([1], [k])), 0, k)
+    return T.reshape(S.shape)
+
+
 class GenericBuilder(nn.Module, UnitaryBuilder):
     """Q-G unitary: `layers` x (per-qubit RY, RZ, then CZ ring).
 
@@ -73,6 +80,22 @@ class GenericBuilder(nn.Module, UnitaryBuilder):
                 U = torch.kron(U, _rz(theta[layer, k, 1]) @ _ry(theta[layer, k, 0]))
             V = self.cz[:, None] * (U @ V)
         return V
+
+    def build_columns(self, theta=None) -> torch.Tensor:
+        """The columns of V with every asset qubit in |0>, shape (2^q, 2^r).
+
+        Same numbers as build()[:, ::2^n] but computed by applying the gates one qubit at
+        a time to a thin matrix, so memory and time grow like 2^q instead of 4^q.
+        """
+        theta = self.theta if theta is None else theta
+        q, n, dR = self.n_qubits, self.n_assets, 2 ** self.n_register
+        S = torch.zeros(2 ** q, dR, dtype=CDTYPE)
+        S[torch.arange(dR) * 2 ** n, torch.arange(dR)] = 1
+        for layer in range(self.layers):
+            for k in range(q):
+                S = _apply_gate(S, _rz(theta[layer, k, 1]) @ _ry(theta[layer, k, 0]), k, q)
+            S = self.cz[:, None] * S
+        return S
 
 def matched_layers(target_params: int, n_register: int, n_assets: int) -> int:
     """Number of GenericBuilder layers whose parameter count is closest to target."""

@@ -325,3 +325,75 @@ def test_model_coarse_objective_runs_and_selects():
     assert len(model.restart_vals) == 2 and model.val_criterion == max(model.restart_vals)
     s = model.score(None, d.symbols, fold.test_idx)
     assert s.shape == (50,) and np.all((s >= 0) & (s <= 1))
+
+
+# ---------------------------------------------------------------- thin-column builder (Sa12)
+def test_build_columns_matches_full_unitary():
+    from models.hqmm.generic import GenericBuilder
+    for r, n in [(1, 3), (2, 3), (2, 4)]:
+        b = GenericBuilder(r, n, layers=3, init_scale=0.7)
+        full = b.build()[:, torch.arange(2 ** r) * 2 ** n]
+        assert torch.allclose(b.build_columns(), full, atol=1e-12)
+
+
+def test_kraus_table_and_gradients_same_with_columns():
+    from models.hqmm.engine import register_kraus_table, total_loglik_coarse, unitary_columns
+    from models.hqmm.generic import GenericBuilder
+    from models.hqmm.measurement import LocalMeasurement
+    Y = np.random.default_rng(0).integers(0, 3, size=(40, 3))
+    grads = []
+    for use_columns in (False, True):
+        torch.manual_seed(0)
+        b = GenericBuilder(2, 3, layers=2, init_scale=0.5)
+        m = LocalMeasurement(3, n_assets=3, shared=False, reset=True)
+        V = unitary_columns(b) if use_columns else b.build()
+        loss = -total_loglik_coarse(register_kraus_table(V, m.rows(), 2, 3), Y, 3, 2)
+        loss.backward()
+        grads.append((loss.item(), b.theta.grad.clone()))
+    assert abs(grads[0][0] - grads[1][0]) < 1e-10
+    assert torch.allclose(grads[0][1], grads[1][1], atol=1e-10)
+
+
+def test_hqmm_model_works_in_the_harness_signature():
+    """The harness calls surprise(data, symbols, idx); scores must not look past day t."""
+    from models.base import Fold
+    from models.hqmm.engine import LBFGSConfig
+    from models.hqmm.generic import GenericBuilder
+    from models.hqmm.model import HQMMModel
+    from tests.helpers import fake_market
+    md, _ = fake_market(T=500, n=3, seed=1)
+    fold = Fold(0, np.arange(0, 300), np.arange(300, 380), np.arange(380, 420))
+    for mode in ("harness", "train_vol"):
+        sym = np.digitize(md.std_returns, np.quantile(md.std_returns, [0.2, 0.8]))
+        m = HQMMModel(lambda n: GenericBuilder(2, n, layers=2), n_restarts=1, symbol_mode=mode,
+                      config=LBFGSConfig(rounds=2, max_iter=3), shared_measurement=False)
+        m.fit(md, sym, fold, seed=0)
+        idx = np.arange(380, 420)
+        s1, sp1 = m.score(md, sym, idx), m.surprise(md, sym, idx)
+        md2 = type(md)(md.dates, md.assets, md.returns.copy(), md.std_returns.copy(), md.corr)
+        md2.returns[421:] *= 5
+        sym2 = sym.copy(); sym2[421:] = 2
+        assert np.allclose(s1, m.score(md2, sym2, idx), atol=1e-9)
+        assert np.allclose(sp1, m.surprise(md2, sym2, idx), atol=1e-9)
+
+
+def test_fitted_equivariant_hqmm_is_invariant_to_asset_relabelling():
+    """Proposition 1 on a FITTED model: relabelling the asset columns leaves scores unchanged for the
+    equivariant HQMM (shared measurement) but not for the generic one."""
+    from models.base import Fold
+    from models.hqmm.engine import LBFGSConfig
+    from models.hqmm.equivariant import EquivariantBuilder
+    from models.hqmm.generic import GenericBuilder
+    from models.hqmm.model import HQMMModel
+    from tests.helpers import fake_market
+    md, _ = fake_market(T=700, n=3, seed=3)
+    sym = np.digitize(md.returns / md.returns[:400].std(axis=0), [-0.8, 0.8])
+    fold = Fold(0, np.arange(0, 400), np.arange(400, 500), np.arange(500, md.T))
+    idx, perm = np.arange(500, md.T), [2, 0, 1]
+    cfg = LBFGSConfig(rounds=2, max_iter=4)
+    e = HQMMModel(lambda n: EquivariantBuilder(2, n, layers=2), n_restarts=1, shared_measurement=True, config=cfg)
+    g = HQMMModel(lambda n: GenericBuilder(2, n, layers=3), n_restarts=1, shared_measurement=False, config=cfg)
+    e.fit(md, sym, fold, 0)
+    g.fit(md, sym, fold, 0)
+    assert np.abs(e.score(md, sym, idx) - e.score(md, sym[:, perm], idx)).max() < 1e-9
+    assert np.abs(g.score(md, sym, idx) - g.score(md, sym[:, perm], idx)).max() > 1e-3
