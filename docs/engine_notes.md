@@ -76,6 +76,18 @@ volatility regimes, so direction is left out of the training objective). Every c
 and neural baseline must get the same choice for the comparison to be fair; Shriker's
 classical HMMs should therefore be fitted to the same extreme / not-extreme counts.
 
+## Session 3: first real-data script (Sa10)
+
+13. **Do not standardise by recent volatility before making symbols.** The plan said to
+    divide returns by a trailing 21-day volatility. In a crisis recent volatility rises too,
+    so the scaled returns look ordinary and the big-move signal disappears. The script
+    divides by each asset's volatility over the training period instead (a fixed number,
+    known in advance, so no look-ahead). Tested in `tests/test_first_real.py`.
+    **Shriker's S2/S3 and paper §3.1 need the same change.**
+14. `experiments/hqmm_first_real.py`: XLF, XLK, XLE; train 1999–2005, validation 2006,
+    test 2007–2010; scored against a volatility label (basket 21-day volatility above the
+    training 90th percentile). A quick stand-in until the harness exists, not the paper protocol.
+
 ## Ideas not yet tried
 - Real data: run on 3 then 9 sector ETFs once Shriker's pipeline lands.
 - Report the AUC distribution over 10 seeds for every model (matches the paper's plan).
@@ -83,3 +95,16 @@ classical HMMs should therefore be fitted to the same extreme / not-extreme coun
 - Train the symmetric builder (Abhinav) with the same objective and compare.
 - Note for the team: the circuit shape matters a lot; Abhinav's symmetric builder may train
   better than the generic one, which would itself be evidence for H2.
+
+## Session 4: integration with the harness, scaling, H1/H2 (details in docs/sarah_findings.md)
+
+15. Reset mode only needs the gate-matrix columns whose asset qubits are |0>. The engine builds just those
+    (`build_columns`, `unitary_columns`): 9 assets went from 11 s to 0.23 s per training step, results identical.
+    The practical limit is now about 11 assets (memory), not 8.
+16. The same categorical HMM goes from AUPRC 0.67 to 0.97 on synthetic data when symbols use
+    training-window volatility instead of trailing 21-day volatility (finding 13 confirmed in the harness).
+    Still to be checked on real data.
+17. With matched symbols the HQMM (0.94) does not beat the classical categorical HMM (0.97) or the spectral
+    OOM (0.95): H1 not supported on synthetic data.
+18. The equivariant builder is exact (relabelling changes scores by ~1e-15) but dense: 3.8 s per step at
+    5 assets, 211 s at 7. H2 above 5 assets needs a faster builder.
