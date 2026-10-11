@@ -36,7 +36,10 @@ RAW_CACHE = os.path.join("data", "raw", "first_real_prices.csv")
 def download_prices(tickers=TICKERS, start=START, end=END, cache=RAW_CACHE) -> pd.DataFrame:
     """Adjusted daily closes, cached to data/raw so later runs work offline."""
     if os.path.exists(cache):
-        return pd.read_csv(cache, index_col=0, parse_dates=True)
+        cached = pd.read_csv(cache, index_col=0, parse_dates=True)
+        if len(cached) > 1000 and all(t in cached.columns for t in tickers):
+            return cached
+        print(f"ignoring unusable cache {cache} ({len(cached)} rows); downloading again")
     import yfinance as yf
     cols = {}
     for t in tickers:  # one ticker at a time, with retries: parallel downloads can hit "database is locked"
@@ -54,6 +57,8 @@ def download_prices(tickers=TICKERS, start=START, end=END, cache=RAW_CACHE) -> p
         else:
             raise RuntimeError(f"could not download {t}; check your internet connection and retry")
     px = pd.DataFrame(cols)[tickers].dropna()
+    if len(px) < 1000:
+        raise RuntimeError(f"only {len(px)} usable rows downloaded; nothing was saved. Check your connection and retry")
     os.makedirs(os.path.dirname(cache), exist_ok=True)
     px.to_csv(cache)
     return px
