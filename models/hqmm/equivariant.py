@@ -58,7 +58,6 @@ def _two_qubit_op(
     return res
 
 
-# --------------------------------------------------------------------------- Step A1
 def perm_operator(sigma: Sequence[int] | np.ndarray, n: int, r: int) -> torch.Tensor:
     """Dense matrix P_sigma that permutes asset qubits, leaving register untouched.
 
@@ -109,7 +108,6 @@ def permute_obs(y, sigma: Sequence[int] | np.ndarray):
     return y_arr[..., inv_sigma]
 
 
-# --------------------------------------------------------------------------- Step A2
 def symmetric_generators(n: int, r: int) -> list[torch.Tensor]:
     """Generators of the S_n-equivariant unitary group on r register + n asset qubits.
 
@@ -149,7 +147,6 @@ def symmetric_generators(n: int, r: int) -> list[torch.Tensor]:
     return generators
 
 
-# --------------------------------------------------------------------------- Step A3
 class EquivariantBuilder(nn.Module, UnitaryBuilder):
     """S_n-equivariant unitary builder for the Q-E model.
 
@@ -192,7 +189,6 @@ class EquivariantBuilder(nn.Module, UnitaryBuilder):
         return V
 
 
-# --------------------------------------------------------------------------- Step A6
 class CorrWeightedBuilder(nn.Module, UnitaryBuilder):
     """Correlation-weighted equivariant unitary builder (Step A6).
 
