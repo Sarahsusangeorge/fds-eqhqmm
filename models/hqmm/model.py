@@ -21,6 +21,7 @@ import torch
 from models.base import Fold, MarketData, RegimeModel
 from models.hqmm.engine import LBFGSConfig, run_filter, train_coarse, train_lbfgs, train_lbfgs_fast
 from models.hqmm.measurement import LocalMeasurement
+from models.hqmm.symbols import apply_train_vol, fit_train_vol
 
 
 class HQMMModel(RegimeModel):
@@ -63,15 +64,11 @@ class HQMMModel(RegimeModel):
         """
         if self.symbol_mode == "harness":
             return np.asarray(symbols)
-        z = data.returns / self._scale
-        return np.digitize(z, self._thresholds).astype(int)
+        return apply_train_vol(data.returns, self._scale, self._thresholds)
 
     def _fit_symbols(self, data, fold):
         window = np.concatenate([fold.train_idx, fold.val_idx])
-        self._scale = data.returns[fold.train_idx].std(axis=0, keepdims=True)
-        z = data.returns[window] / self._scale
-        shares = np.cumsum([0.2, 0.6, 0.2][: self.K - 1]) if self.K == 3 else np.linspace(0, 1, self.K + 1)[1:-1]
-        self._thresholds = np.quantile(z.ravel(), shares)
+        self._scale, self._thresholds = fit_train_vol(data.returns, fold.train_idx, window, self.K)
 
     def fit(self, data: MarketData | None, symbols: np.ndarray, fold: Fold, seed: int) -> "HQMMModel":
         if self.symbol_mode == "train_vol":
