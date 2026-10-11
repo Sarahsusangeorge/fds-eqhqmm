@@ -72,3 +72,25 @@ Cost: EquivariantBuilder forms dense matrix exponentials for 80 generators per l
 step: 0.2 s at 3 assets, 3.8 s at 5, 211 s at 7; 8 assets runs out of memory (7 GB). H2 on a 9-asset
 basket needs a faster builder (apply the gates to the thin column matrix as `GenericBuilder.build_columns`
 does, or work in the symmetric subspace), otherwise use a 3-5 asset sub-basket for the quantum models.
+
+
+## 5. Update: equivariant builder is now as fast as the generic one (branch sarah/equivariant-fast)
+`EquivariantBuilder.build_columns()` computes only the columns reset mode needs. The starting state (assets in
+|0...0>) is symmetric and V commutes with every asset permutation, so the evolution stays in the
+(n+1)-dimensional symmetric subspace; all five asset operators become small (n+1)x(n+1) matrices and the
+result is exact. It matches an eigendecomposition reference to ~1e-14 (the old `build()` uses
+`torch.matrix_exp` and is only accurate to ~1e-10). The dense generators are now built lazily, so a
+9-asset builder no longer needs about 5 GB just to be constructed.
+One loss + gradient step (r=2, K=3, 800 days):
+
+| assets | equivariant before (s) | equivariant now (s) | generic (s) |
+|---|---|---|---|
+| 3 | 0.2 | 0.19 | 0.07 |
+| 5 | 3.8 | 0.11 | 0.05 |
+| 7 | 211 | 0.14 | 0.07 |
+| 9 | out of memory | 0.33 | 0.31 |
+| 11 | out of memory | 2.3 | 2.0 |
+
+H2 (equivariant vs generic) can now be tested on the 9-asset sector basket. `python experiments/runtime_table.py`
+reproduces the table. Not covered: `CorrWeightedBuilder` (its pair weights break the symmetry; it still uses
+the full matrix).

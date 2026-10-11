@@ -41,3 +41,7 @@ logged results in results/.
   Per training step: 0.2 s at 3 assets, 3.8 s at 5, 211 s at 7, out of memory at 8. Please add a
   `build_columns()` (see `GenericBuilder.build_columns` and `engine.unitary_columns`) that applies the
   gates to the 2^q x 2^r thin matrix instead; the engine uses it automatically when it exists.
+
+- **Update:** the speed problem above is fixed in `sarah/equivariant-fast` (`build_columns()` in the symmetric
+  subspace, dense generators built lazily). Abhinav: please review `models/hqmm/equivariant.py` and
+  `tests/test_equivariant_fast.py`.
