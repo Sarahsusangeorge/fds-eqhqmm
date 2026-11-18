@@ -82,3 +82,21 @@ or open `5_Notebooks/01_simulator_qiskit.ipynb`. `02_azure_quantum_hardware.ipyn
 | Figure 9.10 | `7_Results_v2/regime_scores.csv`, `regime_figure.png` |
 | 101 tests | `7_Results_v2/pytest_output.txt` |
 | Sections 9.2 to 9.7 (older development runs) | `7_Results_v2/earlier_tables/` (group repository tables); not regenerated here |
+
+## 10. Additions in paper v3 (matched generic categorical HMM, more quantum folds)
+
+```
+# classical: C-G-cat (generic categorical HMM, 38 parameters at 9 assets), all event folds
+python experiments/run_quantum.py --basket A --scheme rolling --models c-g-cat --seeds 1 --fold-stride 1 --log results/logs/gcat_A.jsonl
+python experiments/run_quantum.py --basket B --scheme rolling --models c-g-cat --seeds 1 --fold-stride 1 --log results/logs/gcat_B.jsonl
+cat results/logs/cheap_A.jsonl results/logs/gcat_A.jsonl > results/logs/merged_cheap_A.jsonl   # same for B
+python experiments/classical_event_folds.py --cheap A:results/logs/merged_cheap_A.jsonl --cheap B:results/logs/merged_cheap_B.jsonl --out results/v2b   # Table 9.8a
+# quantum: extra Basket A event folds, one seed each (about 12-20 min per fit on 2 cores; resumable)
+python experiments/run_quantum.py --basket A --scheme rolling --models qe,qg,qgm --seeds 1 --folds 13 --log results/logs/quantum_A3.jsonl
+python experiments/run_quantum.py --basket A --scheme rolling --models qe,qg,qgm --seeds 1 --folds 21 --log results/logs/quantum_A4.jsonl
+# still to run: Basket A folds 27, 39, 40, 5 and all Basket B event folds; more seeds
+cat results/logs/quantum_A*.jsonl > results/logs/quantum_A_all.jsonl   # do not include quantum_A_all itself twice
+python experiments/analyze_v2.py --cheap A:results/logs/merged_cheap_A.jsonl --quantum A:results/logs/quantum_A_all.jsonl --out results/v2b
+python experiments/synthetic_matched_classical.py   # C-E-cat vs C-G-cat on synthetic data
+```
+`did_A.csv` holds the 2x2 difference-in-differences (symmetry effect for each pair, interaction). Paper v3 supersedes v2.
