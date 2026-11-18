@@ -1,0 +1,33 @@
+key,citation,doi,direct_url
+Adams2007,Adams & MacKay 2007 BOCPD,,https://arxiv.org/pdf/0710.3742
+Adhikary2020,"Adhikary et al 2020 Expressiveness and learning of HQMMs, AISTATS",,https://arxiv.org/pdf/1912.02098
+Ang2002,Ang & Bekaert 2002 Rev Financial Studies,10.1093/rfs/15.4.1137,
+Bollerslev1986,Bollerslev 1986 GARCH J Econometrics,10.1016/0304-4076(86)90063-1,
+Cerqueira2020,Cerqueira Torgo Mozetic 2020 Evaluating time series forecasting models,10.1007/s10994-020-05910-7,https://arxiv.org/pdf/1905.11744
+Ciliberto2018,Ciliberto et al 2018 QML a classical perspective,10.1098/rspa.2017.0551,
+Demsar2006,"Demsar 2006 Statistical comparisons of classifiers, JMLR 7",,https://www.jmlr.org/papers/volume7/demsar06a/demsar06a.pdf
+Fearnhead2007,Fearnhead & Liu 2007 JRSS-B,10.1111/j.1467-9868.2007.00601.x,
+Hamilton1989,Hamilton 1989 Econometrica,10.2307/1912559,
+Hammond2026,Hammond 2026 Geometric observables for financial regime detection (arXiv version),,https://arxiv.org/pdf/2605.17117
+Herman2023,"Herman et al 2023 Quantum computing for finance, Nat Rev Phys",10.1038/s42254-023-00603-1,https://arxiv.org/pdf/2201.02773
+Holm1979,Holm 1979 Scand J Statistics,,
+Hsu2012,Hsu Kakade Zhang 2012 spectral HMM,10.1016/j.jcss.2011.12.025,
+Killick2012,Killick Fearnhead Eckley 2012 PELT,10.1080/01621459.2012.737745,
+Kritzman2011,Kritzman et al 2011 absorption ratio,10.3905/jpm.2011.37.4.112,
+Laloux1999,Laloux et al 1999 Noise dressing,10.1103/PhysRevLett.83.1467,
+Larocca2022,Larocca et al 2022 Group-invariant QML,10.1103/PRXQuantum.3.030341,
+Li2024,Li et al 2024 split HQMM,10.22331/q-2024-01-24-1232,
+Meyer2023,Meyer et al 2023 Exploiting symmetry in VQML,10.1103/PRXQuantum.4.010328,
+Monras2011,Monras Beige Wiesner 2011 HQMM (arXiv 2010),,https://arxiv.org/pdf/1002.2337
+Nguyen2024,Nguyen et al 2024 Theory for equivariant QNNs,10.1103/PRXQuantum.5.020328,
+Rabiner1989,Rabiner 1989 HMM tutorial,10.1109/5.18626,
+Ragone2022,Ragone et al 2022 Representation theory for geometric QML (arXiv),,https://arxiv.org/pdf/2210.07980
+Schatzki2024,"Schatzki et al 2024 Theoretical guarantees for permutation-equivariant QNNs, npj QI 10:12",10.1038/s41534-024-00804-1,https://arxiv.org/pdf/2210.09974
+Schuld2019,Schuld & Killoran 2019 QML in feature Hilbert spaces,10.1103/PhysRevLett.122.040504,
+SchuldKilloran2022,"Schuld & Killoran 2022 Is quantum advantage the right goal for QML, PRX Quantum 3",,https://arxiv.org/pdf/2203.01340
+Skolik2023,Skolik et al 2023 Equivariant quantum circuits for weighted graphs,10.1038/s41534-023-00710-y,
+Song2025,Song Chen Lu 2025 base paper,10.3390/math13152505,https://www.mdpi.com/2227-7390/13/15/2505/pdf
+Srinivasan2018,Srinivasan Gordon Boots 2018 Learning HQMMs,,https://proceedings.mlr.press/v84/srinivasan18a/srinivasan18a.pdf
+Tuysuz2024,Tuysuz et al 2024 Symmetry breaking in geometric QML,10.1103/PRXQuantum.5.030314,
+Zaheer2017,Zaheer et al 2017 Deep Sets,,https://arxiv.org/pdf/1703.06114
+JavadiAbhari2024,Javadi-Abhari et al 2024 Quantum computing with Qiskit,,https://arxiv.org/pdf/2405.08810

@@ -1,0 +1,1 @@
+Base paper: Song, X., Chen, W., & Lu, J. (2025). Research on financial stock market prediction based on the hidden quantum Markov model. Mathematics, 13(15), 2505. https://www.mdpi.com/2227-7390/13/15/2505

@@ -1,0 +1,9 @@
+{
+ "n_rows_raw": 6977,
+ "n_rows_clean": 6977,
+ "n_rows_trimmed": 0,
+ "first_clean_date": "1999-01-04",
+ "n_ffill": 0,
+ "n_left_missing": 0,
+ "fixes": []
+}

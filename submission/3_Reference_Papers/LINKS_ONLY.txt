@@ -1,0 +1,26 @@
+Reference papers not included as PDFs (10 MB upload limit). Open them with the link below.
+Included as full PDFs in this folder: Laloux1999.pdf, Adams2007.pdf, Demsar2006.pdf, Fearnhead2007.pdf, Hsu2012.pdf, Ciliberto2018.pdf, SchuldKilloran2022.pdf, Monras2011.pdf
+
+Adhikary2020 | Adhikary et al 2020 Expressiveness and learning of HQMMs, AISTATS | https://arxiv.org/pdf/1912.02098
+Ang2002 | Ang & Bekaert 2002 Rev Financial Studies | https://doi.org/10.1093/rfs/15.4.1137
+Bollerslev1986 | Bollerslev 1986 GARCH J Econometrics | https://doi.org/10.1016/0304-4076(86)90063-1
+Cerqueira2020 | Cerqueira Torgo Mozetic 2020 Evaluating time series forecasting models | https://doi.org/10.1007/s10994-020-05910-7
+Hamilton1989 | Hamilton 1989 Econometrica | https://doi.org/10.2307/1912559
+Hammond2026 | Hammond 2026 Geometric observables for financial regime detection (arXiv version) | https://arxiv.org/pdf/2605.17117
+Herman2023 | Herman et al 2023 Quantum computing for finance, Nat Rev Phys | https://doi.org/10.1038/s42254-023-00603-1
+Holm1979 | Holm 1979 Scand J Statistics | 
+Killick2012 | Killick Fearnhead Eckley 2012 PELT | https://doi.org/10.1080/01621459.2012.737745
+Kritzman2011 | Kritzman et al 2011 absorption ratio | https://doi.org/10.3905/jpm.2011.37.4.112
+Larocca2022 | Larocca et al 2022 Group-invariant QML | https://doi.org/10.1103/PRXQuantum.3.030341
+Li2024 | Li et al 2024 split HQMM | https://doi.org/10.22331/q-2024-01-24-1232
+Meyer2023 | Meyer et al 2023 Exploiting symmetry in VQML | https://doi.org/10.1103/PRXQuantum.4.010328
+Nguyen2024 | Nguyen et al 2024 Theory for equivariant QNNs | https://doi.org/10.1103/PRXQuantum.5.020328
+Rabiner1989 | Rabiner 1989 HMM tutorial | https://doi.org/10.1109/5.18626
+Ragone2022 | Ragone et al 2022 Representation theory for geometric QML (arXiv) | https://arxiv.org/pdf/2210.07980
+Schatzki2024 | Schatzki et al 2024 Theoretical guarantees for permutation-equivariant QNNs, npj QI 10:12 | https://doi.org/10.1038/s41534-024-00804-1
+Schuld2019 | Schuld & Killoran 2019 QML in feature Hilbert spaces | https://doi.org/10.1103/PhysRevLett.122.040504
+Skolik2023 | Skolik et al 2023 Equivariant quantum circuits for weighted graphs | https://doi.org/10.1038/s41534-023-00710-y
+Srinivasan2018 | Srinivasan Gordon Boots 2018 Learning HQMMs | https://proceedings.mlr.press/v84/srinivasan18a/srinivasan18a.pdf
+Tuysuz2024 | Tuysuz et al 2024 Symmetry breaking in geometric QML | https://doi.org/10.1103/PRXQuantum.5.030314
+Zaheer2017 | Zaheer et al 2017 Deep Sets | https://arxiv.org/pdf/1703.06114
+JavadiAbhari2024 | Javadi-Abhari et al 2024 Quantum computing with Qiskit | https://arxiv.org/pdf/2405.08810

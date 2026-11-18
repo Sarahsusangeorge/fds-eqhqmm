@@ -1,0 +1,6 @@
+case,max_posterior_change,max_loglik_change,permutations
+"all assumptions hold (Q-E circuit, shared measurement)",1.247890679678676e-13,4.547473508864641e-13,24
+"A2 broken: Q-E circuit, separate measurement per asset",0.9253036491166227,95.32711935834868,24
+"A1 broken: generic circuit, shared measurement",0.9745532447389024,20.177855662793718,24
+A1 and A2 broken (Q-G),0.976795672194554,43.46526166259082,24
+"day-by-day independent relabellings (50 draws), all assumptions hold",1.3988810110276972e-14,,50
