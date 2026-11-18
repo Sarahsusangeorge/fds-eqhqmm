@@ -159,6 +159,8 @@ def main(argv=None):
     ap.add_argument("--seeds", type=int, default=3)
     ap.add_argument("--fold-stride", type=int, default=2, help="use every k-th walk-forward fold (default 2)")
     ap.add_argument("--max-folds", type=int, default=None)
+    ap.add_argument("--scheme", default=None, choices=["expanding", "rolling"], help="override config/folds.yaml")
+    ap.add_argument("--folds", default=None, help="comma-separated fold ids to run (overrides --fold-stride)")
     ap.add_argument("--quick", action="store_true", help="every 4th fold, 1 seed")
     ap.add_argument("--K", type=int, default=3, choices=[3, 5], help="symbols per return (3 or 5)")
     ap.add_argument("--symbols", default="train_vol", choices=["train_vol", "harness"])
@@ -175,10 +177,16 @@ def main(argv=None):
     lab_cfg = load_config()
     labels = {r.name: r for r in (label_r1(md, lab_cfg), label_r2(md, lab_cfg), label_r3(md, lab_cfg),
                                   label_r4(md, lab_cfg))}
+    if a.scheme:
+        fc["scheme"] = a.scheme
     folds = make_folds(md.dates, fc.get("scheme", "expanding"), fc["first_train_end"],
                        fc.get("step_months", fc.get("test_step_months", 6)), fc.get("rolling_years", 5),
                        fc.get("val_frac", fc.get("val_fraction", 0.2)))
-    folds = folds[:: a.fold_stride][: a.max_folds]
+    if a.folds:
+        keep = {int(x) for x in a.folds.split(",")}
+        folds = [f for f in folds if f.fold_id in keep]
+    else:
+        folds = folds[:: a.fold_stride][: a.max_folds]
     names = [m.strip() for m in a.models.split(",") if m.strip()]
     models = build_models(names, a.K, "train_vol" if a.symbols == "train_vol" else "harness", a.fast_test, a.restarts)
     log = Path(a.log) if a.log else ROOT / "results" / "logs" / f"runs_quantum_{name}.jsonl"
