@@ -37,7 +37,7 @@ from labels.r4_events import label_r4  # noqa: E402
 from models.hqmm.symbols import train_vol_transform  # noqa: E402
 
 BASKETS = {"A": "us_sectors", "B": "developed_countries"}
-ALL_MODELS = ["qg", "qgm", "qe", "oom", "c-e-cat", "c-g", "lstm", "gru", "tcn", "transformer", "deepsets"]
+ALL_MODELS = ["qg", "qgm", "qe", "oom", "c-e-cat", "c-g", "c-g-cat", "lstm", "gru", "tcn", "transformer", "deepsets"]
 
 
 # ----------------------------------------------------------------------------------------------- data
@@ -121,6 +121,9 @@ def build_models(names, K, symbol_mode, fast_test=False, n_restarts=2):
         elif nm == "c-e-cat":
             from models.classical.hmm_exchangeable import ExchangeableHMM
             out.append(ExchangeableHMM(emission="categorical"))
+        elif nm == "c-g-cat":
+            from models.classical.hmm_generic_cat import GenericCategoricalHMM
+            out.append(GenericCategoricalHMM())
         elif nm == "c-g":
             from models.classical.hmm_generic import GenericGaussianHMM
             out.append(GenericGaussianHMM())

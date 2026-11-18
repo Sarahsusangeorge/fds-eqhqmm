@@ -23,7 +23,7 @@ for c in a.cheap:
             rec = (g[f"metrics.{lab}.recall"].fillna(0) * g[f"metrics.{lab}.n_onsets"]).sum() / n_on
             summ.append(dict(basket=b, label=lab, model=m, params=int(g.n_params.iloc[0]), folds=len(p), onsets=int(n_on),
                              mean_auprc=p[m].mean() if m in p else np.nan, recall=rec, far=g[f"metrics.{lab}.far"].mean()))
-        for x, y in (("C-E-cat", "C-G"),):
+        for x, y in (("C-E-cat", "C-G"), ("C-E-cat", "C-G-cat")):
             if x in p and y in p and len(p) >= 5:
                 diff = p[x] - p[y]
                 pv = wilcoxon(p[x], p[y]).pvalue if np.any(diff != 0) else 1.0

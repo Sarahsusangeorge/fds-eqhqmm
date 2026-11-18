@@ -36,4 +36,16 @@ for c, q in zip(a.cheap, a.quantum):
             rows.append(dict(basket=b, label=lab, model=m, params=int(gg.n_params.iloc[0]), folds=len(p), onsets=int(n_on),
                              mean_auprc=p[m].mean(), median_auprc=p[m].median(), recall=rec, far=gg[f"metrics.{lab}.far"].mean()))
     s = pd.DataFrame(rows); s.to_csv(out / f"summary_{b}.csv", index=False)
+    # H1 / H2 / H3 on the matched folds (descriptive): symmetry effect inside each family, and their difference (interaction)
+    did = []
+    for lab in ("R1", "R4"):
+        p = per[per.label == lab].pivot(index="fold_id", columns="model", values="auprc").dropna()
+        need = {"Q-E", "Q-G", "C-E-cat", "C-G-cat"}
+        if need <= set(p.columns) and len(p):
+            dq, dc = p["Q-E"] - p["Q-G"], p["C-E-cat"] - p["C-G-cat"]
+            did.append(dict(basket=b, label=lab, folds=len(p), sym_effect_quantum=dq.mean(), sym_effect_classical=dc.mean(),
+                            interaction=(dq - dc).mean(), q_wins=int((dq > 0).sum()), c_wins=int((dc > 0).sum()),
+                            quantum_vs_classical_generic=(p["Q-G"] - p["C-G-cat"]).mean(), quantum_vs_classical_equivariant=(p["Q-E"] - p["C-E-cat"]).mean()))
+    pd.DataFrame(did).to_csv(out / f"did_{b}.csv", index=False)
+    if did: print(pd.DataFrame(did).round(3).to_string(index=False))
     print(f"Basket {b}: folds with all of {qmods}: {sorted(folds)}\n", s.round(3).to_string(index=False), "\n")
